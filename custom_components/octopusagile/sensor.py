@@ -1,22 +1,109 @@
-"""Platform for sensor integration."""
-from homeassistant.const import TEMP_CELSIUS
-from homeassistant.helpers.entity import Entity
-from homeassistant.helpers.event import track_point_in_time
-import homeassistant.util.dt as dt_util
-from datetime import timedelta
-from .OctopusAgile.Agile import Agile
+"""OctopusAgile sensor platform (async, modernized)."""
 import logging
+from homeassistant.components.sensor import SensorEntity
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from .const import DOMAIN
+from datetime import datetime, timedelta
 _LOGGER = logging.getLogger(__name__)
 
+async def async_setup_entry(hass, entry, async_add_entities):
+    """Set up OctopusAgile sensors from a config entry."""
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    async_add_entities([
+    OctopusAgileRateSensor(coordinator, "previous"),
+    OctopusAgileRateSensor(coordinator, "current"),
+    OctopusAgileRateSensor(coordinator, "next"),
+        OctopusAgileRateSensor(coordinator, "min"),
+    ])
 
-
-
+class OctopusAgileRateSensor(CoordinatorEntity, SensorEntity):
+    def __init__(self, coordinator, rate_type):
+        super().__init__(coordinator)
+        self._rate_type = rate_type
+    self._attr_name = f"Octopus Agile {rate_type.capitalize()} Rate"
+    self._attr_unique_id = f"octopus_agile_{rate_type}_rate"
+    self._attr_unit_of_measurement = "p/kWh"
+    @property
+    def state(self):
+        rates = self.coordinator.data.get("rates", {})
+        if not rates:
+            return None
+        now = datetime.utcnow()
+    rounded = now.replace(second=0, microsecond=0, minute=(0 if now.minute < 30 else 30))
+    rounded_str = rounded.strftime("%Y-%m-%dT%H:%M:%SZ")
+    if self._rate_type == "previous":
+            prev = rounded - timedelta(minutes=30)
+            prev_str = prev.strftime("%Y-%m-%dT%H:%M:%SZ")
+            return round(rates.get(prev_str, 0), 2)
+        elif self._rate_type == "current":
+            return round(rates.get(rounded_str, 0), 2)
+        elif self._rate_type == "next":
+            next_ = rounded + timedelta(minutes=30)
+            next_str = next_.strftime("%Y-%m-%dT%H:%M:%SZ")
+            return round(rates.get(next_str, 0), 2)
+        elif self._rate_type == "min":
+            return round(min(rates.values()), 2) if rates else None
+        return None
+    @property
+    def extra_state_attributes(self):
+        return {}
 def setup_platform(hass, config, add_entities, discovery_info=None):
-    """Set up the sensor platform."""
-    add_entities([PreviousRate(hass)])
-    add_entities([CurrentRate(hass)])
-    add_entities([NextRate(hass)])
-    add_entities([MinRate(hass)])
+
+"""OctopusAgile sensor platform (async, modernized)."""
+import logging
+from homeassistant.components.sensor import SensorEntity
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from .const import DOMAIN
+
+_LOGGER = logging.getLogger(__name__)
+
+async def async_setup_entry(hass, entry, async_add_entities):
+    """Set up OctopusAgile sensors from a config entry."""
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    async_add_entities([
+        OctopusAgileRateSensor(coordinator, "previous"),
+        OctopusAgileRateSensor(coordinator, "current"),
+        OctopusAgileRateSensor(coordinator, "next"),
+        OctopusAgileRateSensor(coordinator, "min"),
+    ])
+
+
+
+from datetime import datetime, timedelta
+
+class OctopusAgileRateSensor(CoordinatorEntity, SensorEntity):
+    def __init__(self, coordinator, rate_type):
+        super().__init__(coordinator)
+        self._rate_type = rate_type
+        self._attr_name = f"Octopus Agile {rate_type.capitalize()} Rate"
+        self._attr_unique_id = f"octopus_agile_{rate_type}_rate"
+        self._attr_unit_of_measurement = "p/kWh"
+
+    @property
+    def state(self):
+        rates = self.coordinator.data.get("rates", {})
+        if not rates:
+            return None
+        now = datetime.utcnow()
+        rounded = now.replace(second=0, microsecond=0, minute=(0 if now.minute < 30 else 30))
+        rounded_str = rounded.strftime("%Y-%m-%dT%H:%M:%SZ")
+        if self._rate_type == "previous":
+            prev = rounded - timedelta(minutes=30)
+            prev_str = prev.strftime("%Y-%m-%dT%H:%M:%SZ")
+            return round(rates.get(prev_str, 0), 2)
+        elif self._rate_type == "current":
+            return round(rates.get(rounded_str, 0), 2)
+        elif self._rate_type == "next":
+            next_ = rounded + timedelta(minutes=30)
+            next_str = next_.strftime("%Y-%m-%dT%H:%M:%SZ")
+            return round(rates.get(next_str, 0), 2)
+        elif self._rate_type == "min":
+            return round(min(rates.values()), 2) if rates else None
+        return None
+
+    @property
+    def extra_state_attributes(self):
+        return {}
 
 
 class PreviousRate(Entity):

@@ -1,63 +1,42 @@
-"""The octopusagile integration."""
-# Example service data:
-# timers:
-#   - entity_id: "switch.tasmota"
-#     numHrs: 5
-#     day_from: "today"
-#     time_from: "19:00:00"
-#     day_to: "tomorrow"
-#     time_to: "19:00:00"
-#     requirements:
-#       - numHrs: 1
-#         day_from: "today"
-#         time_from: "19:00:00"
-#         day_to: "tomorrow"
-#         time_to: "06:00:00"
-#       - numHrs: 1
-#         day_from: "tomorrow"
-#         time_from: "10:00:00"
-#         day_to: "tomorrow"
-#         time_to: "16:00:00"
-#   - entity_id: "switch.test"
-#     numHrs: 2
-#     day_from: "today"
-#     time_from: "19:00:00"
-#     day_to: "tomorrow"
-#     time_to: "19:00:00"
-
-# import OctopusAgile
-from .OctopusAgile.Agile import Agile
-from homeassistant.helpers.event import track_point_in_time
-import homeassistant.util.dt as dt_util
-from datetime import datetime, timedelta, date
+"""The octopusagile integration (async, modernized)."""
 import logging
-from collections import OrderedDict
-import json
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.typing import ConfigType
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
+from .const import DOMAIN
 
-DOMAIN = "octopusagile"
 _LOGGER = logging.getLogger(__name__)
-_LOGGER.debug("Starting")
-datatorefile = ""
 
-def round_time(t):
-    # Rounds to nearest half hour
-    minute = 00
-    if t.minute//30 == 1:
-        minute = 30
-    return (t.replace(second=0, microsecond=0, minute=minute, hour=t.hour))
 
-def setup(hass, config):
-    first_run = True
-    """Set up is called when Home Assistant is loading our component."""
-    datatorefile = hass.config.path(f"{DOMAIN}.json")
-    if "region_code" not in config["octopusagile"]:
-        _LOGGER.error("region_code must be set for octopusagile")
-    else:
-        region_code = config["octopusagile"]["region_code"]
-        auth = config["octopusagile"]["auth"]
-        mpan = config["octopusagile"]["mpan"]
-        serial = config["octopusagile"]["serial"]
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Set up the OctopusAgile component (for YAML, legacy)."""
+    # Only support config entry setup
+    return True
+
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up OctopusAgile from a config entry."""
+    hass.data.setdefault(DOMAIN, {})
+    from .coordinator import OctopusAgileDataUpdateCoordinator
+    coordinator = OctopusAgileDataUpdateCoordinator(hass, entry.data)
+    await coordinator.async_config_entry_first_refresh()
+    hass.data[DOMAIN][entry.entry_id] = coordinator
+    hass.async_create_task(
+        hass.config_entries.async_forward_entry_setup(entry, "sensor")
+    )
+    return True
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Unload a config entry."""
+    # Unload platforms
+    unload_ok = await hass.config_entries.async_forward_entry_unload(entry, "sensor")
+    # Clean up coordinator if used
+    # hass.data[DOMAIN].pop(entry.entry_id)
+    return unload_ok
         gorate = config["octopusagile"].get("gorate", None)
         godayrate = config["octopusagile"].get("godayrate", None)
         gotimes = config["octopusagile"].get("gotimes", [])
