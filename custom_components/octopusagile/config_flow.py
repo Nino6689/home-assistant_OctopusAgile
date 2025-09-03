@@ -24,8 +24,11 @@ async def async_validate_input(hass, data):
     return {"title": f"Octopus Agile ({data['region_code']})"}
 
 
-class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+
+# Correct ConfigFlow registration for Home Assistant
+class ConfigFlow(config_entries.ConfigFlow):
     """Handle a config flow for OctopusAgile."""
+    DOMAIN = DOMAIN
     VERSION = 1
     CONNECTION_CLASS = config_entries.CONN_CLASS_CLOUD_POLL
 
@@ -53,10 +56,6 @@ class CannotConnect(exceptions.HomeAssistantError):
 
 class InvalidAuth(exceptions.HomeAssistantError):
     """Error to indicate there is invalid auth."""
-
-    VERSION = 1
-    # TODO pick one of the available connection classes in homeassistant/config_entries.py
-    CONNECTION_CLASS = config_entries.CONN_CLASS_UNKNOWN
 
     async def async_step_user(self, user_input=None):
         """Handle the initial step."""
